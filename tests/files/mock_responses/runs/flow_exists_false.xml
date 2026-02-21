@@ -1,0 +1,4 @@
+<oml:flow_exists xmlns:oml="http://openml.org/openml">
+  <oml:id>-1</oml:id>
+  <oml:exists>false</oml:exists>
+</oml:flow_exists>

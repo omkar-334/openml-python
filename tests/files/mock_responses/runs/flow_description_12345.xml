@@ -1,0 +1,7 @@
+<oml:flow xmlns:oml="http://openml.org/openml">
+  <oml:id>12345</oml:id>
+  <oml:name>sklearn.pipeline.Pipeline(SimpleImputer,DecisionTreeClassifier)</oml:name>
+  <oml:description>Pipeline with SimpleImputer and DecisionTreeClassifier</oml:description>
+  <oml:language>English</oml:language>
+  <oml:dependencies>sklearn</oml:dependencies>
+</oml:flow>

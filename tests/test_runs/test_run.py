@@ -4,9 +4,11 @@ from __future__ import annotations
 import os
 import random
 from time import time
+from unittest import mock
 
 import numpy as np
 import pytest
+import requests
 import xmltodict
 from openml_sklearn import SklearnExtension
 from sklearn.base import clone
@@ -18,15 +20,31 @@ from sklearn.tree import DecisionTreeClassifier
 
 import openml
 from openml import OpenMLRun
-from openml.testing import SimpleImputer, TestBase
+from openml.flows.flow import OpenMLFlow
+from openml.testing import SimpleImputer, TestBase, create_request_response
 
 
 class TestRun(TestBase):
     # Splitting not helpful, these test's don't rely on the server and take
     # less than 1 seconds
 
-    @pytest.mark.test_server()
-    def test_tagging(self):
+    @mock.patch.object(requests.Session, "post")
+    @mock.patch.object(requests.Session, "get")
+    def test_tagging(self, mock_get, mock_post):
+        runs_dir = self.static_cache_dir / "mock_responses" / "runs"
+
+        mock_get.side_effect = [
+            create_request_response(status_code=200, content_filepath=runs_dir / "run_list_one.xml"),
+            create_request_response(status_code=200, content_filepath=runs_dir / "run_description_1.xml"),
+            create_request_response(status_code=412, content_filepath=runs_dir / "run_list_empty.xml"),
+            create_request_response(status_code=200, content_filepath=runs_dir / "run_list_with_tag.xml"),
+            create_request_response(status_code=412, content_filepath=runs_dir / "run_list_empty.xml"),
+        ]
+        mock_post.side_effect = [
+            create_request_response(status_code=200, content_filepath=runs_dir / "run_tag.xml"),
+            create_request_response(status_code=200, content_filepath=runs_dir / "run_untag.xml"),
+        ]
+
         runs = openml.runs.list_runs(size=1)
         assert not runs.empty, "Test server state is incorrect"
         run_id = runs["run_id"].iloc[0]
@@ -119,8 +137,39 @@ class TestRun(TestBase):
             assert run_prime_trace_content is None
 
     @pytest.mark.sklearn()
-    @pytest.mark.test_server()
-    def test_to_from_filesystem_vanilla(self):
+    @mock.patch.object(requests.Session, "post")
+    @mock.patch.object(requests.Session, "get")
+    def test_to_from_filesystem_vanilla(self, mock_get, mock_post):
+        tasks_dir = self.static_cache_dir / "mock_responses" / "tasks"
+        datasets_dir = self.static_cache_dir / "mock_responses" / "datasets"
+        runs_dir = self.static_cache_dir / "mock_responses" / "runs"
+
+        mock_get.side_effect = [
+            create_request_response(status_code=200, content_filepath=tasks_dir / "task_description_119.xml"),
+            create_request_response(status_code=200, content_filepath=datasets_dir / "data_description_20.xml"),
+            create_request_response(status_code=200, content_filepath=datasets_dir / "data_features_20.xml"),
+            create_request_response(status_code=200, content_filepath=datasets_dir / "diabetes_splits.arff"),
+            create_request_response(status_code=200, content_filepath=datasets_dir / "diabetes.arff"),
+            # flow/12345 for run_prime._generate_arff_dict()
+            create_request_response(status_code=200, content_filepath=runs_dir / "flow_description_12345.xml"),
+        ]
+        mock_post.side_effect = [
+            create_request_response(status_code=200, content_filepath=runs_dir / "flow_exists_false.xml"),
+            create_request_response(status_code=200, content_filepath=runs_dir / "run_upload.xml"),
+        ]
+
+        def _mock_flow_publish(self_flow):
+            _id = [12345]
+
+            def _assign_ids(flow):
+                flow.flow_id = _id[0]
+                _id[0] += 1
+                for component in flow.components.values():
+                    _assign_ids(component)
+
+            _assign_ids(self_flow)
+            return self_flow
+
         model = Pipeline(
             [
                 ("imputer", SimpleImputer(strategy="mean")),
@@ -128,12 +177,13 @@ class TestRun(TestBase):
             ],
         )
         task = openml.tasks.get_task(119)  # diabetes; crossvalidation
-        run = openml.runs.run_model_on_task(
-            model=model,
-            task=task,
-            add_local_measures=False,
-            upload_flow=True,
-        )
+        with mock.patch.object(OpenMLFlow, "publish", _mock_flow_publish):
+            run = openml.runs.run_model_on_task(
+                model=model,
+                task=task,
+                add_local_measures=False,
+                upload_flow=True,
+            )
 
         cache_path = os.path.join(
             self.workdir,
@@ -155,8 +205,36 @@ class TestRun(TestBase):
 
     @pytest.mark.sklearn()
     @pytest.mark.flaky()
-    @pytest.mark.test_server()
-    def test_to_from_filesystem_search(self):
+    @mock.patch.object(requests.Session, "post")
+    @mock.patch.object(requests.Session, "get")
+    def test_to_from_filesystem_search(self, mock_get, mock_post):
+        tasks_dir = self.static_cache_dir / "mock_responses" / "tasks"
+        datasets_dir = self.static_cache_dir / "mock_responses" / "datasets"
+        runs_dir = self.static_cache_dir / "mock_responses" / "runs"
+
+        mock_get.side_effect = [
+            create_request_response(status_code=200, content_filepath=tasks_dir / "task_description_119.xml"),
+            create_request_response(status_code=200, content_filepath=datasets_dir / "data_description_20.xml"),
+            create_request_response(status_code=200, content_filepath=datasets_dir / "data_features_20.xml"),
+            create_request_response(status_code=200, content_filepath=datasets_dir / "diabetes_splits.arff"),
+            create_request_response(status_code=200, content_filepath=datasets_dir / "diabetes.arff"),
+        ]
+        mock_post.side_effect = [
+            create_request_response(status_code=200, content_filepath=runs_dir / "run_upload.xml"),
+        ]
+
+        def _mock_flow_publish(self_flow):
+            _id = [12345]
+
+            def _assign_ids(flow):
+                flow.flow_id = _id[0]
+                _id[0] += 1
+                for component in flow.components.values():
+                    _assign_ids(component)
+
+            _assign_ids(self_flow)
+            return self_flow
+
         model = Pipeline(
             [
                 ("imputer", SimpleImputer(strategy="mean")),
@@ -183,15 +261,27 @@ class TestRun(TestBase):
 
         run_prime = openml.runs.OpenMLRun.from_filesystem(cache_path)
         self._test_run_obj_equals(run, run_prime)
-        run_prime.publish()
+        with mock.patch.object(OpenMLFlow, "publish", _mock_flow_publish):
+            run_prime.publish()
         TestBase._mark_entity_for_removal("run", run_prime.run_id)
         TestBase.logger.info(
             f"collected from {__file__.split('/')[-1]}: {run_prime.run_id}",
         )
 
     @pytest.mark.sklearn()
-    @pytest.mark.test_server()
-    def test_to_from_filesystem_no_model(self):
+    @mock.patch.object(requests.Session, "get")
+    def test_to_from_filesystem_no_model(self, mock_get):
+        tasks_dir = self.static_cache_dir / "mock_responses" / "tasks"
+        datasets_dir = self.static_cache_dir / "mock_responses" / "datasets"
+
+        mock_get.side_effect = [
+            create_request_response(status_code=200, content_filepath=tasks_dir / "task_description_119.xml"),
+            create_request_response(status_code=200, content_filepath=datasets_dir / "data_description_20.xml"),
+            create_request_response(status_code=200, content_filepath=datasets_dir / "data_features_20.xml"),
+            create_request_response(status_code=200, content_filepath=datasets_dir / "diabetes_splits.arff"),
+            create_request_response(status_code=200, content_filepath=datasets_dir / "diabetes.arff"),
+        ]
+
         model = Pipeline(
             [("imputer", SimpleImputer(strategy="mean")), ("classifier", DummyClassifier())],
         )

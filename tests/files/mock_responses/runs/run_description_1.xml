@@ -1,0 +1,32 @@
+<oml:run xmlns:oml="http://openml.org/openml">
+  <oml:run_id>1</oml:run_id>
+  <oml:uploader>1</oml:uploader>
+  <oml:uploader_name>Test User</oml:uploader_name>
+  <oml:task_id>119</oml:task_id>
+  <oml:task_type>Supervised Classification</oml:task_type>
+  <oml:flow_id>1</oml:flow_id>
+  <oml:flow_name>weka.BayesNet(1)</oml:flow_name>
+  <oml:setup_id>1</oml:setup_id>
+  <oml:setup_string>weka.classifiers.bayes.BayesNet</oml:setup_string>
+  <oml:input_data>
+    <oml:dataset>
+      <oml:did>20</oml:did>
+      <oml:name>diabetes</oml:name>
+      <oml:url>https://api.openml.org/data/v1/download/20/diabetes.arff</oml:url>
+    </oml:dataset>
+  </oml:input_data>
+  <oml:output_data>
+    <oml:file>
+      <oml:did>-1</oml:did>
+      <oml:file_id>1</oml:file_id>
+      <oml:name>description</oml:name>
+      <oml:url>https://api.openml.org/data/v1/download/1/description.xml</oml:url>
+    </oml:file>
+    <oml:file>
+      <oml:did>-1</oml:did>
+      <oml:file_id>2</oml:file_id>
+      <oml:name>predictions</oml:name>
+      <oml:url>https://api.openml.org/data/v1/download/2/predictions.arff</oml:url>
+    </oml:file>
+  </oml:output_data>
+</oml:run>

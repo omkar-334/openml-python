@@ -1,0 +1,4 @@
+<oml:run_tag xmlns:oml="http://openml.org/openml">
+  <oml:id>1</oml:id>
+  <oml:tag>test_tag</oml:tag>
+</oml:run_tag>
